@@ -1,0 +1,153 @@
+---
+title: "Company Bankruptcy"
+author: "Group 5"
+date: "11/22/2021"
+output: 
+html_document:
+    toc: true
+    theme: readable
+    highlight: tango
+    code_folding: show
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Load and treat data
+```{r}
+CompanyData <- read.csv("company.csv", stringsAsFactors = TRUE)
+str(CompanyData)
+summary(CompanyData)
+
+#TO-DO 1
+#library(caret)
+#set.seed(12345)
+#CompanyData_trainup <- upSample(x=CompanyData[,-which(colnames(CompanyData)=="Bankrupt.")], y=CompanyData$Bankrupt.)
+
+# Normalize
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+CompanyData_norm <- as.data.frame(lapply(CompanyData, normalize))
+
+CompanyData_norm$Bankrupt.<- as.factor(CompanyData_norm$Bankrupt.)
+
+CompanyData_norm$Net.Income.Flag <- NULL
+
+summary(CompanyData_norm)
+
+
+```
+## Train and test
+```{r}
+# Randomized cut
+#set.seed(12345)
+#CompanyData_norm <- #CompanyData_norm[sample(nrow(CompanyData_norm)),]
+
+#set.seed(12345)
+#test_set <- sample(1:nrow(CompanyData_norm), nrow(CompanyData_norm)*.25) 
+
+#CompanyData_norm_test <- CompanyData_norm[test_set,]
+#CompanyData_norm_train <- CompanyData_norm[-test_set,]
+
+#summary(CompanyData_norm_train)
+#nrow(CompanyData_norm_train)
+#nrow(CompanyData_norm_test)
+```
+#TO-DO 2
+#Create each model with some form of improvement
+
+## Neural Networks
+```{r}
+library(neuralnet)
+```
+### Run model
+
+```{r, cache = TRUE}
+m_ann <- neuralnet(formula = Bankrupt. ~ ., data = CompanyData_norm, stepmax = 1e8)
+```
+```{r}
+plot(m_ann)
+```
+### Evaluate results
+```{r}
+
+m_ann_results <- compute(m_ann, CompanyData_norm)
+m_ann_prediction <- m_ann_results$net.result
+head(m_ann_prediction)
+summary(m_ann_prediction)
+head(CompanyData_norm)
+
+#m_ann_prediction_ID <- data.frame(m_ann_prediction, CompanyData_norm_test$ID)
+#head(m_ann_prediction_ID)
+
+m_ann_binary <- ifelse(m_ann_prediction >= 0.5, 1,0)
+table(m_ann_binary)
+table(CompanyData_norm$Bankrupt.)
+
+library(caret)
+confusionMatrix(as.factor(m_ann_binary), as.factor(CompanyData_norm$Bankrupt.), positive = "1")
+
+
+
+```
+## Logistic regression model
+### Run model
+
+```{r}
+
+simplemodel <- glm(Bankrupt. ~ ., data = CompanyData_norm, family = binomial(link = "logit"), maxit = 1e8)
+#summary(simplemodel)
+
+```
+
+### Stepwise Regression to find significant variables
+
+```{r}
+stepmodel <- step(simplemodel, direction = "backward")
+summary(stepmodel)
+```
+
+### Prediction based on Step Model
+
+```{r}
+pred_step <- predict(simplemodel, CompanyData_norm, type = "response")
+summary(pred_step)
+pred_cat <- ifelse(pred_step >= 0.5, 1, 0)
+
+```
+
+### Evaluting results
+
+```{r}
+library(caret)
+confusionMatrix(as.factor(pred_cat), as.factor(CompanyData_norm), positive = "1")
+```
+## SVM
+### Run model
+```{r}
+library(kernlab)
+```
+```{r}
+m_svm <- ksvm(as.factor(Bankrupt.) ~ ., data = CompanyData_norm, kernel = "rbfdot")
+
+m_svm
+
+```
+```{r}
+
+m_svm_prediction <- predict(m_svm,CompanyData_norm)
+
+head(m_svm_prediction)
+summary(m_svm_prediction)
+
+agreement_sum <- m_svm_prediction == CompanyData_norm$Bankrupt.
+
+prop.table(table(agreement_sum))
+
+confusionMatrix(as.factor(m_svm_prediction), as.factor(CompanyData_norm$Bankrupt.), positive = "1")
+
+
+```
+
