@@ -13,7 +13,7 @@ html_document:
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 ```
-## Load and treat data test
+## Load and treat data
 ```{r}
 CompanyData <- read.csv("company.csv", stringsAsFactors = TRUE)
 str(CompanyData)
@@ -151,3 +151,41 @@ confusionMatrix(as.factor(m_svm_prediction), as.factor(CompanyData_norm$Bankrupt
 
 ```
 
+### Decision Tree 
+## Run Model
+```{r}
+library(C50)
+CompanyData_norm$Bankrupt. <- as.factor(CompanyData_norm$Bankrupt.)
+decision_tree_model <- C5.0(Bankrupt. ~ ., data = CompanyData_norm)
+plot(decision_tree_model)
+```
+
+## Evaluate Results
+```{r}
+decision_tree_model_result <- predict(decision_tree_model, CompanyData_norm)
+str(decision_tree_model_result)
+summary(decision_tree_model_result)
+
+library(gmodels)
+library(caret)
+confusionMatrix(as.factor(decision_tree_model_result), as.factor(CompanyData_norm$Bankrupt.), positive = '1')
+```
+
+## KNN 
+## Run Model
+```{r}
+#KNN needs its x and y values separate
+library(class)
+knn_x <- CompanyData_norm[ ,-which(colnames(CompanyData_norm) == "Bankrupt.")]
+knn_label <- CompanyData_norm[ , which(colnames(CompanyData_norm) == "Bankrupt.")]
+
+
+knn_model <- knn(train = knn_x, knn_x, cl = knn_label, k = 2)
+
+library(caret)
+
+confusionMatrix(as.factor(knn_model), as.factor(CompanyData_norm$Bankrupt.), positive = '1')
+```
+
+#TO-DO 3
+##Create the level 2 model (decision tree)
