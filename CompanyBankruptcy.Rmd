@@ -39,6 +39,7 @@ CompanyData_norm$Bankrupt.<- as.factor(CompanyData_norm$Bankrupt.)
 CompanyData_norm$Net.Income.Flag <- NULL
 
 summary(CompanyData_norm)
+str(CompanyData_norm)
 
 
 ```
@@ -50,16 +51,17 @@ library(caret)
 CompanyData_ups <- as.data.frame(upSample(CompanyData[,-1],as.factor(CompanyData_norm$Bankrupt.)))
 
 str(CompanyData_ups)
+summary(CompanyData_ups)
 
 ```
 ## Train and test
 ```{r}
 # Randomized cut
 set.seed(12345)
-CompanyData_ups <- CompanyData_ups[sample(nrow(CompanyData_norm)),]
+CompanyData_ups <- CompanyData_ups[sample(nrow(CompanyData_ups)),]
 
 set.seed(12345)
-test_set <- sample(1:nrow(CompanyData_norm), nrow(CompanyData_norm)*.25) 
+test_set <- sample(1:nrow(CompanyData_ups), nrow(CompanyData_ups)*.25) 
 
 CompanyData_ups_test <- CompanyData_norm[test_set,]
 CompanyData_ups_train <- CompanyData_norm[-test_set,]
@@ -78,7 +80,7 @@ library(neuralnet)
 ### Run model
 
 ```{r, cache = TRUE}
-m_ann <- neuralnet(formula = Bankrupt. ~ ., data = CompanyData_ups, stepmax = 1e8)
+m_ann <- neuralnet(formula = Class ~ ., data = CompanyData_ups, stepmax = 1e8)
 ```
 ```{r}
 plot(m_ann)
@@ -97,10 +99,10 @@ head(CompanyData_ups)
 
 m_ann_binary <- ifelse(m_ann_prediction >= 0.5, 1,0)
 table(m_ann_binary)
-table(CompanyData_ups$Bankrupt.)
+table(CompanyData_ups$Class)
 
 library(caret)
-confusionMatrix(as.factor(m_ann_binary), as.factor(CompanyData_ups$Bankrupt.), positive = "1")
+confusionMatrix(as.factor(m_ann_binary), as.factor(CompanyData_ups$Class), positive = "1")
 
 
 
@@ -112,7 +114,7 @@ confusionMatrix(as.factor(m_ann_binary), as.factor(CompanyData_ups$Bankrupt.), p
 
 ```{r}
 
-simplemodel <- glm(Bankrupt. ~ ., data = CompanyData_ups, family = binomial(link = "logit"), maxit = 1e8)
+simplemodel <- glm(Class ~ ., data = CompanyData_ups, family = binomial(link = "logit"), maxit = 1e8)
 #summary(simplemodel)
 
 ```
@@ -137,7 +139,7 @@ pred_cat <- ifelse(pred_step >= 0.5, 1, 0)
 
 ```{r}
 library(caret)
-confusionMatrix(as.factor(pred_cat), as.factor(CompanyData_ups), positive = "1")
+confusionMatrix(as.factor(pred_cat), as.factor(CompanyData_ups$Class), positive = "1")
 ```
 ## SVM
 ### Run model
@@ -145,7 +147,7 @@ confusionMatrix(as.factor(pred_cat), as.factor(CompanyData_ups), positive = "1")
 library(kernlab)
 ```
 ```{r}
-m_svm <- ksvm(as.factor(Bankrupt.) ~ ., data = CompanyData_ups, kernel = "rbfdot")
+m_svm <- ksvm(as.factor(Class) ~ ., data = CompanyData_ups, kernel = "rbfdot")
 
 m_svm
 
@@ -157,11 +159,11 @@ m_svm_prediction <- predict(m_svm,CompanyData_ups)
 head(m_svm_prediction)
 summary(m_svm_prediction)
 
-agreement_sum <- m_svm_prediction == CompanyData_ups$Bankrupt.
+agreement_sum <- m_svm_prediction == CompanyData_ups$Class
 
 prop.table(table(agreement_sum))
 
-confusionMatrix(as.factor(m_svm_prediction), as.factor(CompanyData_ups$Bankrupt.), positive = "1")
+confusionMatrix(as.factor(m_svm_prediction), as.factor(CompanyData_ups$Class), positive = "1")
 
 
 ```
@@ -170,8 +172,8 @@ confusionMatrix(as.factor(m_svm_prediction), as.factor(CompanyData_ups$Bankrupt.
 ## Run Model
 ```{r}
 library(C50)
-CompanyData_ups$Bankrupt. <- as.factor(CompanyData_ups$Bankrupt.)
-decision_tree_model <- C5.0(Bankrupt. ~ ., data = CompanyData_ups)
+CompanyData_ups$Class <- as.factor(CompanyData_ups$Class)
+decision_tree_model <- C5.0(Class ~ ., data = CompanyData_ups)
 plot(decision_tree_model)
 ```
 
@@ -183,7 +185,7 @@ summary(decision_tree_model_result)
 
 library(gmodels)
 library(caret)
-confusionMatrix(as.factor(decision_tree_model_result), as.factor(CompanyData_ups$Bankrupt.), positive = '1')
+confusionMatrix(as.factor(decision_tree_model_result), as.factor(CompanyData_ups$Class), positive = '1')
 ```
 
 ## KNN 
@@ -191,15 +193,15 @@ confusionMatrix(as.factor(decision_tree_model_result), as.factor(CompanyData_ups
 ```{r}
 #KNN needs its x and y values separate
 library(class)
-knn_x <- CompanyData_ups[ ,-which(colnames(CompanyData_ups) == "Bankrupt.")]
-knn_label <- CompanyData_ups[ , which(colnames(CompanyData_ups) == "Bankrupt.")]
+knn_x <- CompanyData_ups[ ,-which(colnames(CompanyData_ups) == "Class")]
+knn_label <- CompanyData_ups[ , which(colnames(CompanyData_ups) == "Class")]
 
 
 knn_model <- knn(train = knn_x, knn_x, cl = knn_label, k = 2)
 
 library(caret)
 
-confusionMatrix(as.factor(knn_model), as.factor(CompanyData_ups$Bankrupt.), positive = '1')
+confusionMatrix(as.factor(knn_model), as.factor(CompanyData_ups$Class), positive = '1')
 ```
 
 #TO-DO 3
