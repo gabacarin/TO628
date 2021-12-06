@@ -69,6 +69,7 @@ CompanyData_ups_train <- CompanyData_norm[-test_set,]
 #summary(CompanyData_ups_train)
 #nrow(CompanyData_ups_train)
 #nrow(CompanyData_ups_test)
+summary(CompanyData_ups)
 ```
 #TO-DO 2
 #Create each model with some form of improvement
@@ -80,7 +81,8 @@ library(neuralnet)
 ### Run model
 
 ```{r, cache = TRUE}
-m_ann <- neuralnet(formula = Class ~ ., data = CompanyData_ups, stepmax = 1e8)
+m_ann <- neuralnet(formula = as.numeric(as.character(Class)) ~ ., data = CompanyData_ups, hidden = 3,stepmax = 1e8)
+str(CompanyData_ups)
 ```
 ```{r}
 plot(m_ann)
@@ -104,7 +106,7 @@ table(CompanyData_ups$Class)
 library(caret)
 confusionMatrix(as.factor(m_ann_binary), as.factor(CompanyData_ups$Class), positive = "1")
 
-
+summary(as.factor(m_ann_prediction))
 
 ```
 
@@ -197,7 +199,7 @@ knn_x <- CompanyData_ups[ ,-which(colnames(CompanyData_ups) == "Class")]
 knn_label <- CompanyData_ups[ , which(colnames(CompanyData_ups) == "Class")]
 
 
-knn_model <- knn(train = knn_x, knn_x, cl = knn_label, k = 2)
+knn_model <- knn(train = knn_x, knn_x, cl = knn_label, k = 5)
 
 library(caret)
 
