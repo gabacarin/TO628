@@ -17,6 +17,7 @@ knitr::opts_chunk$set(echo = TRUE)
 ```{r}
 
 #testing Raph vhghjhvj
+#testing Gabe 123
 CompanyData <- read.csv("company.csv", stringsAsFactors = TRUE)
 str(CompanyData)
 summary(CompanyData)
@@ -39,6 +40,16 @@ CompanyData_norm$Net.Income.Flag <- NULL
 
 summary(CompanyData_norm)
 
+
+```
+
+## Upsample
+
+```{r}
+library(caret)
+CompanyData_ups <- as.data.frame(upSample(CompanyData[,-1],as.factor(CompanyData_norm$Bankrupt.)))
+
+str(CompanyData_ups)
 
 ```
 ## Train and test
@@ -94,6 +105,8 @@ confusionMatrix(as.factor(m_ann_binary), as.factor(CompanyData_norm$Bankrupt.), 
 
 
 ```
+
+
 ## Logistic regression model
 ### Run model
 
