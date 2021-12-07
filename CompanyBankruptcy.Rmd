@@ -99,7 +99,7 @@ head(CompanyData_ups)
 #m_ann_prediction_ID <- data.frame(m_ann_prediction, CompanyData_norm_test$ID)
 #head(m_ann_prediction_ID)
 
-m_ann_binary <- ifelse(m_ann_prediction[,2] >= 0.5, 1,0)
+m_ann_binary <- ifelse(m_ann_prediction >= 0.5, 1,0)
 table(m_ann_binary)
 table(CompanyData_ups$Class)
 
@@ -116,19 +116,18 @@ summary(as.factor(m_ann_prediction))
 
 ```{r}
 
-simplemodel <- glm(Class ~ ., data = CompanyData_ups, family = binomial(link = "logit"), maxit = 1e8)
+simplemodel <- glm(Class ~ ., data = CompanyData_ups, family = "binomial", maxit = 1e8)
 #summary(simplemodel)
 
 ```
 
-### Stepwise Regression to find significant variables
-
 ```{r}
-stepmodel <- step(simplemodel, direction = "backward")
-summary(stepmodel)
+### Stepwise Regression to find significant variables
+#stepmodel <- step(simplemodel, direction = "backward")
+#summary(stepmodel)
 ```
 
-### Prediction based on Step Model
+### Prediction based on Simple Model
 
 ```{r}
 pred_step <- predict(simplemodel, CompanyData_ups, type = "response")
