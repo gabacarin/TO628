@@ -1,0 +1,326 @@
+---
+title: "Company Bankruptcy v3"
+author: "Group 5 - Devlin McConnel, Gabriel Bacarin, Marcelo Medrado, Raphael Thomas"
+date: "12/09/2021"
+output: 
+html_document:
+    toc: true
+    theme: readable
+    highlight: tango
+    code_folding: show
+---
+
+# Introduction
+
+This model intends to predict what companies are likely to go bankrupty. It follows the approach below:
+1) Data cleaning and upSample
+2) Level I Models:
+-Neural Network
+-Decision Tree
+-KNN 
+-SVM
+-Logistic regression
+3) Stacked Model:
+Decision tree with Cost Matrix
+
+The model presented in class had an accuracy of almost 100%. We believed this was because we were using the same data for test and train in the level 1 models. For this reason, in this submission we separated test and train data sets. Even so, surprisingly, the tunned decision tree is able to reach Accuracy of 99% and Kappa of .99
+
+
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+## Load and treat data
+```{r}
+
+CompanyData <- read.csv("company.csv", stringsAsFactors = TRUE)
+str(CompanyData)
+summary(CompanyData)
+
+#TO-DO 1
+#library(caret)
+#set.seed(12345)
+#CompanyData_trainup <- upSample(x=CompanyData[,-which(colnames(CompanyData)=="Bankrupt.")], y=CompanyData$Bankrupt.)
+
+# Normalize
+normalize <- function(x) {
+  return ((x - min(x)) / (max(x) - min(x)))
+}
+
+CompanyData_norm <- as.data.frame(lapply(CompanyData, normalize))
+
+CompanyData_norm$Bankrupt.<- as.factor(CompanyData_norm$Bankrupt.)
+
+CompanyData_norm$Net.Income.Flag <- NULL
+
+#str(CompanyData_norm)
+
+
+```
+
+## Upsample
+
+```{r}
+library(caret)
+CompanyData_ups <- as.data.frame(upSample(CompanyData[,-1],as.factor(CompanyData_norm$Bankrupt.)))
+
+head(CompanyData_ups)
+
+```
+## Train and test
+```{r}
+# Randomized cut
+set.seed(12345)
+CompanyData_ups <- CompanyData_ups[sample(nrow(CompanyData_ups)),]
+
+set.seed(12345)
+test_set <- sample(1:nrow(CompanyData_ups), nrow(CompanyData_ups)*.25) 
+
+CompanyData_ups_test <- CompanyData_ups[test_set,]
+CompanyData_ups_train <- CompanyData_ups[-test_set,]
+
+#summary(CompanyData_ups_train)
+#nrow(CompanyData_ups_train)
+#nrow(CompanyData_ups_test)
+#summary(CompanyData_ups)
+```
+#TO-DO 2
+#Create each model with some form of improvement
+
+## Neural Networks
+```{r}
+library(neuralnet)
+```
+### Run model
+
+```{r, cache = TRUE}
+m_ann <- neuralnet(formula = as.numeric(as.character(Class)) ~ ., data = CompanyData_ups_train, hidden = 3,stepmax = 1e8)
+#str(CompanyData_ups)
+```
+```{r}
+plot(m_ann)
+```
+### Evaluate results
+```{r}
+
+m_ann_results <- compute(m_ann, CompanyData_ups_test)
+
+#to be used in the stacked model
+m_ann_results_train <- compute(m_ann, CompanyData_ups_train)
+m_ann_prediction_train <- m_ann_results_train$net.result
+  
+m_ann_prediction <- m_ann_results$net.result
+head(m_ann_prediction)
+summary(m_ann_prediction)
+head(CompanyData_ups)
+
+#m_ann_prediction_ID <- data.frame(m_ann_prediction, CompanyData_norm_test$ID)
+#head(m_ann_prediction_ID)
+
+m_ann_binary <- ifelse(m_ann_prediction >= 0.504, 1,0)
+table(m_ann_binary)
+table(CompanyData_ups_test$Class)
+
+library(caret)
+confusionMatrix(as.factor(m_ann_binary), as.factor(CompanyData_ups_test$Class), positive = "1")
+
+
+```
+
+
+## Logistic regression model
+### Run model
+
+```{r}
+
+simplemodel <- glm(Class ~ ., data = CompanyData_ups_train, family = "binomial", maxit = 1e8)
+#summary(simplemodel)
+
+```
+
+```{r}
+### Stepwise Regression to find significant variables
+#stepmodel <- step(simplemodel, direction = "backward")
+#summary(stepmodel)
+```
+
+### Prediction based on Simple Model
+
+```{r}
+pred_step <- predict(simplemodel, CompanyData_ups_test, type = "response")
+
+
+
+summary(pred_step)
+pred_cat <- ifelse(pred_step >= 0.5, 1, 0)
+
+# to be used in the stacked model
+pred_step_train <- predict(simplemodel, CompanyData_ups_train, type = "response")
+```
+
+### Evaluting results
+
+```{r}
+library(caret)
+confusionMatrix(as.factor(pred_cat), as.factor(CompanyData_ups_test$Class), positive = "1")
+```
+## SVM
+### Run model
+```{r}
+library(kernlab)
+```
+```{r}
+m_svm <- ksvm(as.factor(Class) ~ ., data = CompanyData_ups_train, kernel = "rbfdot")
+
+m_svm
+
+```
+```{r}
+
+m_svm_prediction <- predict(m_svm,CompanyData_ups_test)
+
+head(m_svm_prediction)
+summary(m_svm_prediction)
+
+agreement_sum <- m_svm_prediction == CompanyData_ups_test$Class
+
+prop.table(table(agreement_sum))
+
+confusionMatrix(as.factor(m_svm_prediction), as.factor(CompanyData_ups_test$Class), positive = "1")
+
+# to be used in the stacked model:
+m_svm_prediction_train <- predict(m_svm,CompanyData_ups_train)
+
+
+```
+
+### Tunned Decision Tree 
+## Run Model
+```{r}
+library(C50)
+library(irr)
+library(ipred)
+library(caret)
+CompanyData_ups_train$Class <- as.factor(CompanyData_ups_train$Class)
+#decision_tree_model <- C5.0(Class ~ ., data = CompanyData_ups)
+ctrl <- trainControl(method = "cv", number = 10,
+                     selectionFunction = "oneSE")
+
+# use expand.grid() to create grid of tuning parameters
+grid <- expand.grid(.model = "tree",
+                    .trials = c(1, 5, 10, 15, 20, 25, 30, 35),
+                    .winnow = "FALSE")
+
+# look at the result of expand.grid()
+grid
+
+# customize train() with the control list and grid of parameters 
+set.seed(300)
+decision_tree_model <- train(Class ~ ., data = CompanyData_ups_train, method = "C5.0",
+           metric = "Kappa",
+           trControl = ctrl,
+           tuneGrid = grid)
+
+decision_tree_model
+```
+
+## Evaluate Results
+```{r}
+decision_tree_model_result <- predict(decision_tree_model, CompanyData_ups_test)
+str(decision_tree_model_result)
+summary(decision_tree_model_result)
+
+library(gmodels)
+library(caret)
+confusionMatrix(as.factor(decision_tree_model_result), as.factor(CompanyData_ups_test$Class), positive = '1')
+
+# to be used in the stacked model
+decision_tree_model_result_train <- predict(decision_tree_model, CompanyData_ups_train)
+```
+
+## KNN 
+## Run Model
+```{r}
+#KNN needs its x and y values separate
+library(class)
+knn_x_train <- CompanyData_ups_train[ ,-which(colnames(CompanyData_ups_train) == "Class")]
+knn_label <- CompanyData_ups_train[ , which(colnames(CompanyData_ups_train) == "Class")]
+knn_x_test <- CompanyData_ups_test[ ,-which(colnames(CompanyData_ups_test) == "Class")]
+
+
+knn_model <- knn(train = knn_x_train, knn_x_test, cl = knn_label, k = 5)
+
+summary(knn_model)
+library(caret)
+
+confusionMatrix(as.factor(knn_model), as.factor(CompanyData_ups_test$Class), positive = '1')
+
+# to be used in the stacked model:
+knn_model_train <- knn(train = knn_x_train, knn_x_train, cl = knn_label, k = 5)
+```
+
+## Consolidating models
+```{r}
+
+#pred_step
+#as.factor(knn_prediction)
+#mc5.0_result
+#m_ann_prediction
+#m_svm_prediction
+
+CompanyData_frame_test <- data.frame(pred_step,knn_model,decision_tree_model_result,m_ann_prediction,m_svm_prediction,CompanyData_ups_test$Class)
+summary(CompanyData_frame_test)
+
+CompanyData_frame_train <- data.frame(pred_step_train,knn_model_train,decision_tree_model_result_train,m_ann_prediction_train,m_svm_prediction_train,CompanyData_ups_train$Class)
+# renaming variables:
+CompanyData_frame_train$pred_step <- CompanyData_frame_train$pred_step_train
+CompanyData_frame_train$knn_model <- CompanyData_frame_train$knn_model_train
+CompanyData_frame_train$decision_tree_model_result <- CompanyData_frame_train$decision_tree_model_result_train
+CompanyData_frame_train$m_ann_prediction <- CompanyData_frame_train$m_ann_prediction_train
+CompanyData_frame_train$m_svm_prediction <- CompanyData_frame_train$m_svm_prediction_train
+
+CompanyData_frame_train$pred_step_train <- NULL
+CompanyData_frame_train$knn_model_train <- NULL
+CompanyData_frame_train$decision_tree_model_result_train <- NULL
+CompanyData_frame_train$m_ann_prediction_train <- NULL
+CompanyData_frame_train$m_svm_prediction_train <- NULL
+
+summary(CompanyData_frame_train)
+```
+## Creating stacked model
+### Train and test
+Train set was created with the predictions on the train data. Test was created with the predictions on the test data.
+```{r}
+# Train 
+#set.seed(12345)
+#test_set <- sample(1:nrow(CompanyData_frame), nrow(CompanyData_frame)*.25) 
+
+#CompanyData_frame_test <- CompanyData_frame[test_set,]
+#CompanyData_frame_train <- CompanyData_frame[-test_set,]
+#summary(CompanyData_frame_train)
+```
+### Decision Tree
+```{r}
+library(C50)
+error_cost <- matrix(c(0, 1, 4, 0), nrow = 2)
+
+mc5.0_stacked <- C5.0(CompanyData_ups_train.Class ~ ., data = CompanyData_frame_train, costs = error_cost)
+
+mc5.0_stacked
+
+# Stacked model used Decision tree, SVM and Ann.
+
+```
+
+### Evaluating results
+```{r}
+mc5.0_result <- predict(mc5.0_stacked, CompanyData_frame_test)
+summary(mc5.0_result)
+summary(CompanyData_frame_test)
+
+confusionMatrix(as.factor(mc5.0_result), as.factor(CompanyData_frame_test$CompanyData_ups_test.Class), positive = "1")
+
+```
+The stacked model is able to predict Bankruptcy with an Accuracy of 99.45% and Kappa of .9891. The main level 1 model contributing to this result is the tunned decision tree model.
+
